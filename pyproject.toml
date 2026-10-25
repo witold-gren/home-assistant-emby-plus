@@ -2,7 +2,7 @@
 name = "home-assistant-emby-plus"
 version = "0.1.0"
 description = "Emby Plus for Home Assistant: Emby players configured in the UI, reconnecting when the server comes back."
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -10,7 +10,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
