@@ -1,0 +1,78 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Emby server",
+        "description": "Address and API key of the Emby server (Emby dashboard -> Advanced -> API keys). When configuration.yaml still has `platform: emby`, the fields are filled in from it.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "ssl": "Use HTTPS",
+          "api_key": "API key"
+        },
+        "data_description": {
+          "host": "IP address or name of the Emby server, e.g. 192.168.1.2",
+          "port": "8096 for HTTP, 8920 for HTTPS"
+        }
+      },
+      "reconfigure": {
+        "title": "Emby server",
+        "description": "Change the address or API key of the Emby server.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "ssl": "Use HTTPS",
+          "api_key": "API key"
+        }
+      },
+      "reauth_confirm": {
+        "title": "New API key",
+        "description": "The Emby server at {host} rejected the API key. Enter a valid one.",
+        "data": {
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the Emby server. Check the address and that the server is on.",
+      "invalid_auth": "The server rejected the API key.",
+      "unknown": "Unexpected error, see the log."
+    },
+    "abort": {
+      "already_configured": "This Emby server is already configured.",
+      "reauth_successful": "The API key was updated.",
+      "reconfigure_successful": "The server settings were updated.",
+      "wrong_server": "This address belongs to a different Emby server."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "server": {
+        "name": "Server"
+      }
+    },
+    "sensor": {
+      "active_playbacks": {
+        "name": "Active playbacks",
+        "unit_of_measurement": "playbacks"
+      }
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Emby server at {url} is not reachable ({error}); retrying in the background."
+    },
+    "invalid_auth": {
+      "message": "The Emby server rejected the API key."
+    },
+    "command_failed": {
+      "message": "Emby did not accept the command {command}: {error}"
+    }
+  },
+  "issues": {
+    "yaml_emby_platform": {
+      "title": "Remove the Emby YAML configuration",
+      "description": "Emby Plus has replaced the built-in Emby integration, but configuration.yaml still has `media_player: - platform: emby`. While it is there, both integrations show the same players. Remove that block and restart Home Assistant; Emby Plus then takes over the existing `media_player.emby_*` entities with their names, areas and entity IDs."
+    }
+  }
+}

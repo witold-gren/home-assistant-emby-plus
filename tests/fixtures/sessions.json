@@ -1,0 +1,61 @@
+[
+  {
+    "Id": "sess-ha",
+    "DeviceId": "emby_plus-config-flow",
+    "DeviceName": "Home Assistant",
+    "Client": "Home Assistant",
+    "SupportsRemoteControl": false,
+    "PlayState": {}
+  },
+  {
+    "Id": "sess-core",
+    "DeviceId": "2335917080054",
+    "DeviceName": "HomeAssistant",
+    "Client": "pyEmby",
+    "SupportsRemoteControl": false,
+    "PlayState": {}
+  },
+  {
+    "Id": "sess-key",
+    "DeviceId": "a1b2c3d4e5f6",
+    "DeviceName": "Home Assistant",
+    "Client": "Home Assistant",
+    "SupportsRemoteControl": false,
+    "PlayState": {}
+  },
+  {
+    "Id": "sess-tv",
+    "DeviceId": "tv-0001",
+    "DeviceName": "LG Smart TV (OLED55)",
+    "Client": "Emby for LG",
+    "ApplicationVersion": "2.1.3",
+    "UserName": "Rodzina",
+    "SupportsRemoteControl": true,
+    "PlayState": {
+      "PositionTicks": 6000000000,
+      "IsPaused": false
+    },
+    "NowPlayingItem": {
+      "Id": "6809",
+      "Name": "W złym miejscu",
+      "Type": "Episode",
+      "SeriesName": "Lego Ninjago",
+      "SeriesId": "6774",
+      "SeriesPrimaryImageTag": "series-tag",
+      "ParentIndexNumber": 2,
+      "IndexNumber": 19,
+      "RunTimeTicks": 13262400000,
+      "ImageTags": {
+        "Primary": "episode-tag"
+      }
+    }
+  },
+  {
+    "Id": "sess-dlna",
+    "DeviceId": "uuid:dlna-0001",
+    "DeviceName": "[LG] webOS TV OLED55",
+    "Client": "Emby Server DLNA",
+    "SupportsRemoteControl": false,
+    "PlayState": {}
+  }
+]

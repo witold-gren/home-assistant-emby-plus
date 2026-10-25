@@ -1,0 +1,78 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Serwer Emby",
+        "description": "Adres i klucz API serwera Emby (panel Emby -> Zaawansowane -> Klucze API). Gdy w configuration.yaml jest jeszcze `platform: emby`, pola są wypełnione z niego.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "ssl": "Użyj HTTPS",
+          "api_key": "Klucz API"
+        },
+        "data_description": {
+          "host": "Adres IP albo nazwa serwera Emby, np. 192.168.1.2",
+          "port": "8096 dla HTTP, 8920 dla HTTPS"
+        }
+      },
+      "reconfigure": {
+        "title": "Serwer Emby",
+        "description": "Zmień adres albo klucz API serwera Emby.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "ssl": "Użyj HTTPS",
+          "api_key": "Klucz API"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Nowy klucz API",
+        "description": "Serwer Emby pod adresem {host} odrzucił klucz API. Wpisz prawidłowy.",
+        "data": {
+          "api_key": "Klucz API"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie można połączyć się z serwerem Emby. Sprawdź adres i czy serwer jest włączony.",
+      "invalid_auth": "Serwer odrzucił klucz API.",
+      "unknown": "Nieoczekiwany błąd, szczegóły w dzienniku."
+    },
+    "abort": {
+      "already_configured": "Ten serwer Emby jest już skonfigurowany.",
+      "reauth_successful": "Klucz API został zmieniony.",
+      "reconfigure_successful": "Ustawienia serwera zostały zmienione.",
+      "wrong_server": "Pod tym adresem jest inny serwer Emby."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "server": {
+        "name": "Serwer"
+      }
+    },
+    "sensor": {
+      "active_playbacks": {
+        "name": "Aktywne odtwarzania",
+        "unit_of_measurement": "odtwarzania"
+      }
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Serwer Emby pod adresem {url} nie odpowiada ({error}); ponawiam w tle."
+    },
+    "invalid_auth": {
+      "message": "Serwer Emby odrzucił klucz API."
+    },
+    "command_failed": {
+      "message": "Emby nie przyjął polecenia {command}: {error}"
+    }
+  },
+  "issues": {
+    "yaml_emby_platform": {
+      "title": "Usuń konfigurację Emby z YAML",
+      "description": "Emby Plus zastąpiło wbudowaną integrację Emby, ale w configuration.yaml nadal jest `media_player: - platform: emby`. Dopóki tam jest, obie integracje pokazują te same odtwarzacze. Usuń ten blok i zrestartuj Home Assistant - Emby Plus przejmie wtedy istniejące encje `media_player.emby_*` razem z nazwami, obszarami i identyfikatorami."
+    }
+  }
+}
