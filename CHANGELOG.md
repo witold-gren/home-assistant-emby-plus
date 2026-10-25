@@ -2,6 +2,26 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [SemVer](https://semver.org/).
 
+## [0.1.1] - 2026-10-25
+
+### Changed
+- Entity ids are English in every Home Assistant language (`sensor.<server>_active_playbacks`
+  instead of `sensor.<serwer>_aktywne_odtwarzania` in a Polish installation); displayed names
+  stay translated.
+- A server that is off is a normal state, not a setup error. The entry loads, the *Server*
+  sensor is off and the websocket loop connects as soon as the server answers. Before,
+  the entry showed a red "retrying setup" error for as long as the server (e.g. a NAS
+  that runs one hour a day) was off.
+- Known players are restored from the device registry, so they are plainly unavailable
+  while the server is off or their app is closed, instead of "no longer provided".
+- A lost connection is logged at info level, not as a warning.
+
+### Fixed
+- The server's version is kept in the device registry while the server is off, and
+  updated when it comes back with a newer Emby.
+- An API key rejected while reconnecting starts the reauth flow once, instead of
+  logging an unexpected error every minute.
+
 ## [0.1.0] - 2026-10-25
 
 First release: a UI-configured replacement for the core `emby` integration.

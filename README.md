@@ -15,7 +15,7 @@ when the server is not always on, for example on a NAS with a power schedule:
 | Problem in the core `emby` integration | Emby Plus |
 | --- | --- |
 | YAML only: *"This integration was not set up in the UI"*. | Set up in **Settings → Devices & services**. It can also be reconfigured and re-authenticated there. |
-| [pyEmby](https://github.com/mezz64/pyEmby) registers with the server **once**, when Home Assistant starts. If the server is off at that moment, every `media_player.emby_*` stays unavailable until the next restart of Home Assistant. There is no reload action. | When the server is not reachable, the setup raises `ConfigEntryNotReady`. Home Assistant then retries it in the background with growing delays. A websocket that drops later reconnects after 5, 10, 30 and then every 60 s. A lost connection is logged once, not every few seconds. |
+| [pyEmby](https://github.com/mezz64/pyEmby) registers with the server **once**, when Home Assistant starts. If the server is off at that moment, every `media_player.emby_*` stays unavailable until the next restart of Home Assistant. There is no reload action. | A server that is off is a normal state, not an error: the integration loads, the *Server* sensor is off, and the known players are unavailable. It tries to connect after 5, 10, 30 and then every 60 s, and connects on its own as soon as the server answers. A lost connection is logged once, at info level. |
 | The poster URL has no `/emby` prefix and asks for the *Thumb* image, which items rarely have. The Home Assistant image proxy gets 404, so `entity_picture` is empty. | The item's *Primary* image, else the series' or album's one, at `/emby/Items/{id}/Images/Primary`. It works through the proxy, also outside the home network. |
 | No server device and no way to see whether the server is up. | An **Emby server** device with a *Server* connectivity sensor and an *Active playbacks* sensor. The sensor's `playing` attribute shows what plays where. |
 | pyEmby opens its own aiohttp session and uses deprecated asyncio APIs. | A small client on Home Assistant's shared session. No extra requirements. |
@@ -51,6 +51,10 @@ take over the existing entities:
    disabled status. Dashboards and automations keep working.
 
 ## Entities
+
+Entity IDs are English in every Home Assistant language (e.g. `sensor.<server>_active_playbacks`
+also in a Polish installation, not `sensor.<serwer>_aktywne_odtwarzania`); the displayed names
+are translated.
 
 - `media_player.*`: one per Emby client app on a device, e.g. *Emby for LG* on a TV.
   - States: playing, paused or idle. The player is unavailable while the app is closed or

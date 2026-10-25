@@ -14,7 +14,7 @@ serwer włącza się i wyłącza, np. NAS z harmonogramem zasilania:
 | Problem wbudowanej integracji `emby` | Emby Plus |
 | --- | --- |
 | Tylko YAML: *„Ta integracja nie została skonfigurowana w interfejsie użytkownika”*. | Konfiguracja w **Ustawienia → Urządzenia i usługi**, tam też zmiana adresu i klucza API. |
-| [pyEmby](https://github.com/mezz64/pyEmby) rejestruje się na serwerze **raz**, przy starcie HA. Jeśli serwer jest wtedy wyłączony, wszystkie `media_player.emby_*` są niedostępne aż do następnego restartu HA. Nie ma akcji przeładowania. | Gdy serwer nie odpowiada, start zgłasza `ConfigEntryNotReady` i HA sam ponawia go w tle z rosnącym odstępem. Websocket, który zerwie się później, łączy się ponownie po 5, 10, 30, a potem co 60 s. Utrata połączenia trafia do dziennika raz, a nie co kilka sekund. |
+| [pyEmby](https://github.com/mezz64/pyEmby) rejestruje się na serwerze **raz**, przy starcie HA. Jeśli serwer jest wtedy wyłączony, wszystkie `media_player.emby_*` są niedostępne aż do następnego restartu HA. Nie ma akcji przeładowania. | Wyłączony serwer to zwykły stan, a nie błąd: integracja się ładuje, czujnik *Serwer* jest wyłączony, a znane odtwarzacze są niedostępne. Próby połączenia następują po 5, 10, 30, a potem co 60 s, i integracja sama się podłącza, gdy serwer odpowie. Utrata połączenia trafia do dziennika raz, na poziomie info. |
 | Adres plakatu nie ma prefiksu `/emby` i prosi o obraz *Thumb*, którego pozycje zwykle nie mają. Proxy obrazów HA dostaje 404, więc `entity_picture` jest puste. | Obraz *Primary* pozycji, a gdy go brak, serialu albo albumu, pod `/emby/Items/{id}/Images/Primary`. Działa przez proxy HA, także poza siecią domową. |
 | Nie ma urządzenia serwera ani informacji, czy serwer działa. | Urządzenie **serwera Emby** z czujnikiem łączności *Serwer* i czujnikiem *Aktywne odtwarzania*. Jego atrybut `playing` pokazuje, co gra i gdzie. |
 | pyEmby otwiera własną sesję aiohttp i używa przestarzałych API asyncio. | Mały klient na wspólnej sesji HA, bez dodatkowych zależności. |
@@ -50,6 +50,10 @@ przejąć istniejące encje:
    dalej.
 
 ## Encje
+
+Identyfikatory encji są angielskie w każdym języku Home Assistant (np.
+`sensor.<server>_active_playbacks` także w polskiej instalacji, a nie
+`sensor.<serwer>_aktywne_odtwarzania`); nazwy wyświetlane są przetłumaczone.
 
 - `media_player.*`: jedna na aplikację Emby na urządzeniu, np. *Emby for LG* na
   telewizorze.

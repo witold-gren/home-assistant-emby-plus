@@ -11,8 +11,9 @@ from typing import Any
 
 import aiohttp
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 
-from .api import CLIENT_NAME, CannotConnect, EmbyClient, session_key
+from .api import CLIENT_NAME, CannotConnect, EmbyClient, InvalidAuth, session_key
 from .const import DOMAIN, KEEPALIVE_INTERVAL, RECONNECT_DELAYS, SESSIONS_INTERVAL_MS
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,6 +33,8 @@ class EmbyHub:
         self.server_version: str | None = info.get("Version")
         self.server_device_id: str | None = None
         self.connected = True
+        # called once when the server rejects the API key (starts the reauth flow)
+        self.on_auth_failed: Callable[[], None] | None = None
         # key (DeviceId.Client) -> session; keys stay after a session ends
         self.sessions: dict[str, dict[str, Any]] = {}
         self.active: set[str] = set()
@@ -75,6 +78,20 @@ class EmbyHub:
                 listener(new)
         self._notify()
 
+    @callback
+    def async_restore_players(self, devices: list[dr.DeviceEntry]) -> None:
+        """Known players from the device registry, so they exist (unavailable) while the
+        server is off or their app is not running."""
+        for device in devices:
+            for domain, key in device.identifiers:
+                if domain != DOMAIN or key == self.server_id or key in self.sessions:
+                    continue
+                self.sessions[key] = {
+                    "DeviceName": device.name,
+                    "Client": device.model,
+                    "ApplicationVersion": device.sw_version,
+                }
+
     def _is_api_client(self, session: dict[str, Any]) -> bool:
         """Sessions of API clients, not players: this integration (also its config flow),
         the core integration (pyEmby) and requests made with the API key alone, which
@@ -100,7 +117,7 @@ class EmbyHub:
         if connected:
             _LOGGER.info("Connected to Emby server %s", self.server_name)
         else:
-            _LOGGER.warning(
+            _LOGGER.info(
                 "Lost connection to Emby server %s, reconnecting in the background",
                 self.server_name,
             )
@@ -112,6 +129,12 @@ class EmbyHub:
         while not self._stopped:
             try:
                 await self._async_listen()
+            except InvalidAuth:
+                _LOGGER.warning("Emby server %s rejected the API key", self.server_name)
+                self._set_connected(False)
+                if self.on_auth_failed is not None:
+                    self.on_auth_failed()
+                break
             except CannotConnect as err:
                 _LOGGER.debug("Emby websocket failed: %s", err)
             except (aiohttp.ClientError, TimeoutError) as err:
@@ -134,6 +157,7 @@ class EmbyHub:
             await ws.send_str(
                 json.dumps({"MessageType": "SessionsStart", "Data": f"0,{SESSIONS_INTERVAL_MS}"})
             )
+            await self._async_update_server_info()
             # the websocket answers only on changes - start from the full list
             self.async_update_sessions(await self.client.async_get_sessions())
             self._set_connected(True)
@@ -161,6 +185,19 @@ class EmbyHub:
         finally:
             self._ws = None
             await ws.close()
+
+    async def _async_update_server_info(self) -> None:
+        """Name and version may have changed while the server was off (e.g. an update)."""
+        info = await self.client.async_get_server_info()
+        name = info.get("ServerName") or self.server_name
+        version = info.get("Version") or self.server_version
+        if (name, version) == (self.server_name, self.server_version):
+            return
+        self.server_name, self.server_version = name, version
+        if self.server_device_id is not None:
+            dr.async_get(self.hass).async_update_device(
+                self.server_device_id, name=name, sw_version=version
+            )
 
     @callback
     def _handle_message(self, data: str) -> float | None:

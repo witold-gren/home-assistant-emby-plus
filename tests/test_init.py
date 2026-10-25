@@ -28,23 +28,54 @@ async def test_setup_and_unload(hass: HomeAssistant, setup_entry) -> None:
     assert setup_entry.state is ConfigEntryState.NOT_LOADED
 
 
-async def test_server_off_at_start_is_retried(
-    hass: HomeAssistant, aioclient_mock, server_info, sessions, no_yaml, no_websocket
+async def test_server_off_at_start_is_not_an_error(
+    hass: HomeAssistant,
+    aioclient_mock,
+    server_info,
+    sessions,
+    no_yaml,
+    no_websocket,
+    device_registry: dr.DeviceRegistry,
 ) -> None:
-    """The bug of the core integration: NAS off at Home Assistant start."""
-    aioclient_mock.get(f"{BASE}/System/Info", exc=aiohttp.ClientConnectionError())
+    """The bug of the core integration: NAS off at Home Assistant start. Off is a normal
+    state here - the entry loads, known players exist and the websocket loop connects."""
+    # a previous run left the server (with its version) and a player in the registry
     entry = entry_for(hass)
-    await hass.config_entries.async_setup(entry.entry_id)
-    assert entry.state is ConfigEntryState.SETUP_RETRY
-    assert "10.0.0.2:8096" in entry.reason
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "a1b2c3d4e5f6")},
+        name="Domowy NAS",
+        sw_version="4.9.1.80",
+    )
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "tv-0001.Emby for LG")},
+        name="LG Smart TV",
+        model="Emby for LG",
+    )
+    aioclient_mock.get(f"{BASE}/System/Info", exc=aiohttp.ClientConnectionError())
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
 
-    # the NAS is on now - the next retry connects
-    aioclient_mock.clear_requests()
-    aioclient_mock.get(f"{BASE}/System/Info", json=server_info)
-    aioclient_mock.get(f"{BASE}/Sessions", json=sessions)
-    await hass.config_entries.async_reload(entry.entry_id)
     assert entry.state is ConfigEntryState.LOADED
-    assert hass.states.get("media_player.lg_smart_tv_oled55").state == "playing"
+    assert entry.reason is None
+    assert hass.states.get("binary_sensor.domowy_nas_server").state == "off"
+    assert hass.states.get("sensor.domowy_nas_active_playbacks").state == "unavailable"
+    tv = hass.states.get("media_player.lg_smart_tv")
+    assert tv.state == "unavailable"
+    assert not tv.attributes.get("restored")
+    server = device_registry.async_get_device_by_identifier(
+        (DOMAIN, "a1b2c3d4e5f6"), entry.entry_id
+    )
+    assert server.sw_version == "4.9.1.80"
+
+    # the NAS is on now - the websocket loop connects and the players come back
+    hub = entry.runtime_data
+    hub.async_update_sessions(sessions)
+    hub._set_connected(True)
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.domowy_nas_server").state == "on"
+    assert hass.states.get("media_player.lg_smart_tv").state == "playing"
 
 
 async def test_rejected_key_starts_reauth(

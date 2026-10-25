@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
-from custom_components.emby_plus.api import CannotConnect
+from custom_components.emby_plus.api import CannotConnect, InvalidAuth
 from custom_components.emby_plus.hub import EmbyHub
 
 
@@ -17,6 +17,9 @@ def make_hub(hass, sessions_answer=None) -> EmbyHub:
     client = MagicMock()
     client.device_id = "emby_plus-test"
     client.async_get_sessions = AsyncMock(return_value=sessions_answer or [])
+    client.async_get_server_info = AsyncMock(
+        return_value={"Id": "srv", "ServerName": "NAS", "Version": "4.9"}
+    )
     return EmbyHub(hass, client, {"Id": "srv", "ServerName": "NAS", "Version": "4.9"})
 
 
@@ -180,3 +183,52 @@ async def test_unexpected_error_does_not_stop_the_loop(hass, caplog) -> None:
         await hub.async_run()
     assert "Unexpected error in the Emby websocket" in caplog.text
     assert hub.client.async_ws_connect.await_count == 2
+
+
+async def test_rejected_key_while_reconnecting_starts_reauth(hass, caplog) -> None:
+    """A key revoked while the server was off: one reauth, no error every minute."""
+    hub = make_hub(hass)
+    hub.client.async_ws_connect = AsyncMock(side_effect=InvalidAuth("HTTP 401"))
+    hub.on_auth_failed = MagicMock()
+    with patch("custom_components.emby_plus.hub.asyncio.sleep", AsyncMock()):
+        await hub.async_run()
+    hub.on_auth_failed.assert_called_once()
+    assert hub.client.async_ws_connect.await_count == 1
+    assert not hub.connected
+    assert "rejected the API key" in caplog.text
+
+
+async def test_server_update_while_off_reaches_the_device(hass, device_registry) -> None:
+    """The NAS came back with a newer Emby - the server device shows the new version."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    entry = MockConfigEntry(domain="emby_plus")
+    entry.add_to_hass(hass)
+    device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={("emby_plus", "srv")}, sw_version="4.9"
+    )
+    hub = make_hub(hass)
+    hub.server_device_id = device.id
+    hub.client.async_get_server_info.return_value = {
+        "Id": "srv",
+        "ServerName": "NAS",
+        "Version": "4.10",
+    }
+    hub.client.async_ws_connect = AsyncMock(return_value=FakeWebsocket([]))
+    with pytest.raises(CannotConnect):
+        await hub._async_listen()
+    assert hub.server_version == "4.10"
+    assert device_registry.async_get(device.id).sw_version == "4.10"
+
+
+async def test_lost_connection_is_not_a_warning(hass, caplog) -> None:
+    """The NAS is switched off every day - that is no warning."""
+    hub = make_hub(hass)
+    hub.client.async_ws_connect = AsyncMock(side_effect=CannotConnect("off"))
+
+    async def fake_sleep(delay):
+        hub._stopped = True
+
+    with patch("custom_components.emby_plus.hub.asyncio.sleep", fake_sleep):
+        await hub.async_run()
+    assert [r.levelname for r in caplog.records if "Lost connection" in r.message] == ["INFO"]

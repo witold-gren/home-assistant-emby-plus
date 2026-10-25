@@ -2,16 +2,19 @@
 
 Why not the core `emby` integration: it is YAML-only, and pyEmby registers with the server
 once, at Home Assistant start. A server that is off then (e.g. a NAS on a schedule) leaves
-every player unavailable until the next restart. Here the setup raises
-ConfigEntryNotReady, so Home Assistant retries it, and the websocket reconnects on its own.
+every player unavailable until the next restart. Here a server that is off is a normal
+state, not a setup error: the entry loads with the last known server and players, the
+"Server" sensor is off, and the websocket loop connects as soon as the server answers.
 """
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_SSL, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -20,6 +23,8 @@ from .const import DOMAIN
 from .entity import server_device_info
 from .hub import EmbyHub
 from .migration import async_adopt_core_entities, async_find_yaml_config, async_update_yaml_issue
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.MEDIA_PLAYER, Platform.SENSOR]
 
@@ -39,8 +44,10 @@ def create_client(hass: HomeAssistant, data: dict, device_id: str) -> EmbyClient
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: EmbyConfigEntry) -> bool:
-    """Connect to the server; not reachable = Home Assistant retries later."""
+    """Load the entry; a server that is off is connected later by the websocket loop."""
     client = create_client(hass, dict(entry.data), f"{DOMAIN}-{entry.entry_id}")
+    sessions: list[dict] = []
+    online = True
     try:
         info = await client.async_get_server_info()
         sessions = await client.async_get_sessions()
@@ -49,11 +56,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: EmbyConfigEntry) -> bool
             translation_domain=DOMAIN, translation_key="invalid_auth"
         ) from err
     except CannotConnect as err:
-        raise ConfigEntryNotReady(
-            translation_domain=DOMAIN,
-            translation_key="cannot_connect",
-            translation_placeholders={"url": client.base_url, "error": str(err)},
-        ) from err
+        # the unique id is the server id; name and version stay in the device registry
+        _LOGGER.info(
+            "Emby server at %s is off (%s), connecting when it answers", client.base_url, err
+        )
+        info = {"Id": entry.unique_id, "ServerName": entry.title}
+        online = False
 
     yaml_config = await async_find_yaml_config(hass)
     async_update_yaml_issue(hass, yaml_config is not None)
@@ -61,11 +69,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: EmbyConfigEntry) -> bool
         async_adopt_core_entities(hass, entry)
 
     hub = EmbyHub(hass, client, info)
+    hub.connected = online
+    hub.on_auth_failed = lambda: entry.async_start_reauth(hass)
+    device_registry = dr.async_get(hass)
     # the server device first - the players link to it (via_device_id)
-    server = dr.async_get(hass).async_get_or_create(
+    server = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id, **server_device_info(hub)
     )
     hub.server_device_id = server.id
+    hub.async_restore_players(dr.async_entries_for_config_entry(device_registry, entry.entry_id))
     hub.async_update_sessions(sessions)
     entry.runtime_data = hub
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
